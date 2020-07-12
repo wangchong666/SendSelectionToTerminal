@@ -5,7 +5,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 //import com.jediterm.terminal.TerminalOutputStream;
@@ -14,7 +13,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Arrays;
 //import org.jetbrains.plugins.terminal.JBTabbedTerminalWidget;
 //import org.jetbrains.plugins.terminal.JBTerminalPanel;
 //import org.jetbrains.plugins.terminal.JBTerminalWidget;
@@ -54,7 +52,7 @@ public class SendSelectionToTerminal extends AnAction {
     }
 
     void sendText(JComponent root,String text){
-        printComponent(root);
+        findComponent(root);
         if(jbTerminalWidget != null){
             try {
                 log.info("invoke");
@@ -67,19 +65,27 @@ public class SendSelectionToTerminal extends AnAction {
                 Object stream =  myTerminalOutputField.get(jediTerminal);
                 Method sendString = stream.getClass().getMethod("sendString",String.class);
                 Method sendBytes = stream.getClass().getMethod("sendBytes",byte[].class);
-                sendString.invoke(stream,text);
-                sendBytes.invoke(stream,new byte[]{13});
+                if(text.split("\n").length>1) {
+                    sendString.invoke(stream, ":paste");
+                    sendBytes.invoke(stream, new byte[]{13});
+                    sendString.invoke(stream, text);
+                    sendBytes.invoke(stream, new byte[]{13, 4});
+                }
+                else{
+                    sendString.invoke(stream, text);
+                    sendBytes.invoke(stream, new byte[]{13});
+                }
             } catch (Exception e1) {
                 log.error(e1.toString());
             }
         }
     }
 
-    void printComponent(Component c){
+    void findComponent(Component c){
         if(c == null) return;
-        log.info(c.getName()+" "+c.getClass()+" "+c.getClass().getClassLoader());
+        log.info(c.getName()+" "+c.getClass());
         if(c instanceof JPanel){
-            printComponent(((JPanel)c).getComponent(0));
+            findComponent(((JPanel)c).getComponent(0));
         }
         if("terminal".equals(c.getName())){
             log.info("found a JBTerminalWidget");
